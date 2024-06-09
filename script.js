@@ -1,89 +1,134 @@
-document.addEventListener('DOMContentLoaded', () => {
-    loadVideos();
-    loadDarkMode();
-    
-    document.getElementById('addVideoButton').addEventListener('click', addVideoFromInput);
-    document.getElementById('darkModeToggle').addEventListener('change', toggleDarkMode);
-    document.getElementById('settingsButton').addEventListener('click', openSettings);
-    document.getElementById('closeSettingsButton').addEventListener('click', closeSettings);
-});
+document.addEventListener('DOMContentLoaded', loadVideos);
 
-function addVideoFromInput() {
-    const url = document.getElementById('videoUrl').value;
-    addVideo(url);
+function addVideo() {
+    const videoUrl = document.getElementById('videoUrl').value;
+    if (videoUrl) {
+        const videoID = getYouTubeID(videoUrl);
+        if (videoID) {
+            addVideoToDOM(videoID);
+            saveVideos();
+            document.getElementById('videoUrl').value = ''; // Clear the input field
+        } else {
+            alert("Invalid YouTube URL");
+        }
+    }
+}
+
+function removeVideo(button) {
+    const videoContainer = button.parentElement;
+    videoContainer.remove();
     saveVideos();
 }
 
-function addVideo(url) {
-    const videoId = extractVideoId(url);
-    if (!videoId) {
-        alert("Invalid YouTube URL");
-        return;
-    }
-
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${videoId}`;
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-    iframe.allowFullscreen = true;
-
-    const videoContainer = document.createElement('div');
-    videoContainer.classList.add('video-container');
-    videoContainer.appendChild(iframe);
-
-    const removeButton = document.createElement('button');
-    removeButton.classList.add('remove-video');
-    removeButton.textContent = 'X';
-    removeButton.addEventListener('click', () => {
-        videoContainer.remove();
-        saveVideos();
-    });
-
-    videoContainer.appendChild(removeButton);
-    document.getElementById('videoContainer').appendChild(videoContainer);
-}
-
-function extractVideoId(url) {
+function getYouTubeID(url) {
     const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     const match = url.match(regex);
     return match ? match[1] : null;
 }
 
+function addVideoToDOM(videoID) {
+    const videoContainer = document.createElement("div");
+    videoContainer.className = "video-container";
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube.com/embed/${videoID}`;
+    iframe.allowFullscreen = true;
+    const removeButton = document.createElement("button");
+    removeButton.className = "remove-video";
+    removeButton.innerText = "Remove";
+    removeButton.onclick = function() {
+        removeVideo(removeButton);
+    };
+    videoContainer.appendChild(iframe);
+    videoContainer.appendChild(removeButton);
+    document.getElementById("videoContainer").appendChild(videoContainer);
+
+    makeInteractable(videoContainer);
+}
+
+function makeInteractable(element) {
+    interact(element)
+        .draggable({
+            listeners: {
+                start(event) {
+                    element.style.zIndex = 9999;  // Bring the element to the front while dragging
+                },
+                move(event) {
+                    let { x, y } = event.target.dataset;
+                    x = (parseFloat(x) || 0) + event.dx;
+                    y = (parseFloat(y) || 0) + event.dy;
+
+                    event.target.style.transform = `translate(${x}px, ${y}px)`;
+                    Object.assign(event.target.dataset, { x, y });
+                },
+                end(event) {
+                    element.style.zIndex = "";  // Reset the z-index after dragging
+                    saveVideos();
+                }
+            }
+        })
+        .resizable({
+            edges: { left: true, right: true, bottom: true, top: false },
+            listeners: {
+                move(event) {
+                    let { x, y } = event.target.dataset;
+                    x = (parseFloat(x) || 0) + event.deltaRect.left;
+                    y = (parseFloat(y) || 0) + event.deltaRect.top;
+
+                    Object.assign(event.target.style, {
+                        width: `${event.rect.width}px`,
+                        height: `${event.rect.height}px`,
+                        transform: `translate(${x}px, ${y}px)`
+                    });
+
+                    Object.assign(event.target.dataset, { x, y });
+                },
+                end() {
+                    saveVideos();
+                }
+            }
+        });
+}
+
 function saveVideos() {
-    const videoContainers = document.querySelectorAll('.video-container iframe');
-    const videoUrls = Array.from(videoContainers).map(iframe => iframe.src);
-    localStorage.setItem('videos', JSON.stringify(videoUrls));
+    const videoContainers = document.querySelectorAll(".video-container");
+    const videoData = Array.from(videoContainers).map(container => {
+        const iframe = container.querySelector("iframe");
+        return {
+            id: getYouTubeID(iframe.src),
+            width: container.style.width,
+            height: container.style.height,
+            x: container.dataset.x || 0,
+            y: container.dataset.y || 0
+        };
+    });
+    console.log("Saving videos:", videoData);  // Debugging log
+    localStorage.setItem('videos', JSON.stringify(videoData));
 }
 
 function loadVideos() {
-    const videoUrls = JSON.parse(localStorage.getItem('videos')) || [];
-    videoUrls.forEach(url => addVideo(url));
-}
+    const savedVideos = JSON.parse(localStorage.getItem('videos') || '[]');
+    console.log("Loading videos:", savedVideos);  // Debugging log
+    savedVideos.forEach(video => {
+        const videoContainer = document.createElement("div");
+        videoContainer.className = "video-container";
+        videoContainer.style.width = video.width;
+        videoContainer.style.height = video.height;
+        videoContainer.style.transform = `translate(${video.x}px, ${video.y}px)`;
+        videoContainer.dataset.x = video.x;
+        videoContainer.dataset.y = video.y;
+        const iframe = document.createElement("iframe");
+        iframe.src = `https://www.youtube.com/embed/${video.id}`;
+        iframe.allowFullscreen = true;
+        const removeButton = document.createElement("button");
+        removeButton.className = "remove-video";
+        removeButton.innerText = "Remove";
+        removeButton.onclick = function() {
+            removeVideo(removeButton);
+        };
+        videoContainer.appendChild(iframe);
+        videoContainer.appendChild(removeButton);
+        document.getElementById("videoContainer").appendChild(videoContainer);
 
-function toggleDarkMode() {
-    const isDarkMode = document.getElementById('darkModeToggle').checked;
-    if (isDarkMode) {
-        document.body.classList.add('dark-mode');
-    } else {
-        document.body.classList.remove('dark-mode');
-    }
-    localStorage.setItem('darkMode', isDarkMode);
-}
-
-function loadDarkMode() {
-    const isDarkMode = JSON.parse(localStorage.getItem('darkMode'));
-    if (isDarkMode) {
-        document.body.classList.add('dark-mode');
-        document.getElementById('darkModeToggle').checked = true;
-    } else {
-        document.body.classList.remove('dark-mode');
-        document.getElementById('darkModeToggle').checked = false;
-    }
-}
-
-function openSettings() {
-    document.getElementById('settingsDialog').showModal();
-}
-
-function closeSettings() {
-    document.getElementById('settingsDialog').close();
+        makeInteractable(videoContainer);
+    });
 }
