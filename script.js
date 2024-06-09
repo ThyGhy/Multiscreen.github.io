@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Load saved layout
-    const savedLayout = JSON.parse(localStorage.getItem('videoLayout'));
+    const savedLayout = JSON.parse(localStorage.getItem('currentVideoLayout'));
     if (savedLayout) {
         loadLayout(savedLayout);
     }
@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addVideo(embedUrl);
                 addVideoModal.style.display = 'none';
                 addVideoForm.reset();
+                saveCurrentLayout();
             } else {
                 alert('Invalid YouTube URL.');
             }
@@ -78,22 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function saveLayout(name) {
-        const layout = [];
-        document.querySelectorAll('.video-box').forEach(box => {
-            const video = {
-                id: box.getAttribute('data-id'),
-                url: box.querySelector('iframe').src,
-                position: {
-                    x: box.style.left,
-                    y: box.style.top
-                },
-                size: {
-                    width: box.style.width,
-                    height: box.style.height
-                }
-            };
-            layout.push(video);
-        });
+        const layout = getCurrentLayout();
         localStorage.setItem(`layout_${name}`, JSON.stringify(layout));
         alert('Layout saved!');
     }
@@ -126,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const layout = JSON.parse(localStorage.getItem(`layout_${layoutName}`));
             if (layout) {
                 loadLayout(layout);
+                localStorage.setItem('currentVideoLayout', JSON.stringify(layout));
                 manageLayoutsModal.style.display = 'none';
             }
         });
@@ -179,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         removeButton.classList.add('remove-button');
         removeButton.addEventListener('click', () => {
             videoBox.remove();
+            saveCurrentLayout();
         });
         videoBox.appendChild(removeButton);
 
@@ -209,6 +197,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 target.setAttribute('data-x', x);
                 target.setAttribute('data-y', y);
             });
+
+        saveCurrentLayout();
+    }
+
+    function getCurrentLayout() {
+        const layout = [];
+        document.querySelectorAll('.video-box').forEach(box => {
+            const video = {
+                id: box.getAttribute('data-id'),
+                url: box.querySelector('iframe').src,
+                position: {
+                    x: box.style.left,
+                    y: box.style.top
+                },
+                size: {
+                    width: box.style.width,
+                    height: box.style.height
+                }
+            };
+            layout.push(video);
+        });
+        return layout;
+    }
+
+    function saveCurrentLayout() {
+        const layout = getCurrentLayout();
+        localStorage.setItem('currentVideoLayout', JSON.stringify(layout));
     }
 
     function dragMoveListener(event) {
@@ -223,5 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the position attributes
         target.setAttribute('data-x', x);
         target.setAttribute('data-y', y);
+
+        saveCurrentLayout();
     }
 });
