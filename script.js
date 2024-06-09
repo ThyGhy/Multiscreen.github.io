@@ -1,134 +1,227 @@
-document.addEventListener('DOMContentLoaded', loadVideos);
+document.addEventListener('DOMContentLoaded', () => {
+    const gridContainer = document.getElementById('gridContainer');
+    const manageLayoutsButton = document.getElementById('manageLayouts');
+    const darkModeToggle = document.getElementById('darkMode');
+    const addVideoButton = document.getElementById('addVideo');
+    const addVideoModal = document.getElementById('addVideoModal');
+    const manageLayoutsModal = document.getElementById('manageLayoutsModal');
+    const closeModalButtons = document.querySelectorAll('.close-button');
+    const addVideoForm = document.getElementById('addVideoForm');
+    const saveLayoutForm = document.getElementById('saveLayoutForm');
+    const savedLayoutsList = document.getElementById('savedLayoutsList');
 
-function addVideo() {
-    const videoUrl = document.getElementById('videoUrl').value;
-    if (videoUrl) {
-        const videoID = getYouTubeID(videoUrl);
-        if (videoID) {
-            addVideoToDOM(videoID);
-            saveVideos();
-            document.getElementById('videoUrl').value = ''; // Clear the input field
-        } else {
-            alert("Invalid YouTube URL");
-        }
+    // Initialize dark mode
+    const isDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        darkModeToggle.checked = true;
     }
-}
 
-function removeVideo(button) {
-    const videoContainer = button.parentElement;
-    videoContainer.remove();
-    saveVideos();
-}
+    darkModeToggle.addEventListener('change', () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('darkMode', darkModeToggle.checked);
+    });
 
-function getYouTubeID(url) {
-    const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-}
+    // Load saved layout
+    const savedLayout = JSON.parse(localStorage.getItem('videoLayout'));
+    if (savedLayout) {
+        loadLayout(savedLayout);
+    }
 
-function addVideoToDOM(videoID) {
-    const videoContainer = document.createElement("div");
-    videoContainer.className = "video-container";
-    const iframe = document.createElement("iframe");
-    iframe.src = `https://www.youtube.com/embed/${videoID}`;
-    iframe.allowFullscreen = true;
-    const removeButton = document.createElement("button");
-    removeButton.className = "remove-video";
-    removeButton.innerText = "Remove";
-    removeButton.onclick = function() {
-        removeVideo(removeButton);
-    };
-    videoContainer.appendChild(iframe);
-    videoContainer.appendChild(removeButton);
-    document.getElementById("videoContainer").appendChild(videoContainer);
+    manageLayoutsButton.addEventListener('click', () => {
+        manageLayoutsModal.style.display = 'block';
+        loadSavedLayouts();
+    });
 
-    makeInteractable(videoContainer);
-}
+    closeModalButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            button.closest('.modal').style.display = 'none';
+        });
+    });
 
-function makeInteractable(element) {
-    interact(element)
-        .draggable({
-            listeners: {
-                start(event) {
-                    element.style.zIndex = 9999;  // Bring the element to the front while dragging
-                },
-                move(event) {
-                    let { x, y } = event.target.dataset;
-                    x = (parseFloat(x) || 0) + event.dx;
-                    y = (parseFloat(y) || 0) + event.dy;
+    window.addEventListener('click', (event) => {
+        if (event.target === addVideoModal) {
+            addVideoModal.style.display = 'none';
+        }
+        if (event.target === manageLayoutsModal) {
+            manageLayoutsModal.style.display = 'none';
+        }
+    });
 
-                    event.target.style.transform = `translate(${x}px, ${y}px)`;
-                    Object.assign(event.target.dataset, { x, y });
-                },
-                end(event) {
-                    element.style.zIndex = "";  // Reset the z-index after dragging
-                    saveVideos();
-                }
+    addVideoButton.addEventListener('click', () => {
+        addVideoModal.style.display = 'block';
+    });
+
+    addVideoForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const videoUrl = document.getElementById('videoUrl').value;
+        if (videoUrl) {
+            const embedUrl = getEmbedUrl(videoUrl);
+            if (embedUrl) {
+                addVideo(embedUrl);
+                addVideoModal.style.display = 'none';
+                addVideoForm.reset();
+            } else {
+                alert('Invalid YouTube URL.');
             }
-        })
-        .resizable({
-            edges: { left: true, right: true, bottom: true, top: false },
-            listeners: {
-                move(event) {
-                    let { x, y } = event.target.dataset;
-                    x = (parseFloat(x) || 0) + event.deltaRect.left;
-                    y = (parseFloat(y) || 0) + event.deltaRect.top;
+        }
+    });
 
-                    Object.assign(event.target.style, {
-                        width: `${event.rect.width}px`,
-                        height: `${event.rect.height}px`,
-                        transform: `translate(${x}px, ${y}px)`
-                    });
+    saveLayoutForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const layoutName = document.getElementById('layoutName').value;
+        if (layoutName) {
+            saveLayout(layoutName);
+            saveLayoutForm.reset();
+            loadSavedLayouts();
+        }
+    });
 
-                    Object.assign(event.target.dataset, { x, y });
+    function saveLayout(name) {
+        const layout = [];
+        document.querySelectorAll('.video-box').forEach(box => {
+            const video = {
+                id: box.getAttribute('data-id'),
+                url: box.querySelector('iframe').src,
+                position: {
+                    x: box.style.left,
+                    y: box.style.top
                 },
-                end() {
-                    saveVideos();
+                size: {
+                    width: box.style.width,
+                    height: box.style.height
                 }
+            };
+            layout.push(video);
+        });
+        localStorage.setItem(`layout_${name}`, JSON.stringify(layout));
+        alert('Layout saved!');
+    }
+
+    function loadLayout(layout) {
+        gridContainer.innerHTML = '';
+        layout.forEach(video => {
+            addVideo(video.url, video);
+        });
+    }
+
+    function loadSavedLayouts() {
+        savedLayoutsList.innerHTML = '';
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('layout_')) {
+                const layoutName = key.replace('layout_', '');
+                const listItem = document.createElement('li');
+                listItem.textContent = layoutName;
+                listItem.appendChild(createLoadButton(layoutName));
+                listItem.appendChild(createDeleteButton(layoutName));
+                savedLayoutsList.appendChild(listItem);
             }
         });
-}
+    }
 
-function saveVideos() {
-    const videoContainers = document.querySelectorAll(".video-container");
-    const videoData = Array.from(videoContainers).map(container => {
-        const iframe = container.querySelector("iframe");
-        return {
-            id: getYouTubeID(iframe.src),
-            width: container.style.width,
-            height: container.style.height,
-            x: container.dataset.x || 0,
-            y: container.dataset.y || 0
-        };
-    });
-    console.log("Saving videos:", videoData);  // Debugging log
-    localStorage.setItem('videos', JSON.stringify(videoData));
-}
+    function createLoadButton(layoutName) {
+        const loadButton = document.createElement('button');
+        loadButton.textContent = 'Load';
+        loadButton.addEventListener('click', () => {
+            const layout = JSON.parse(localStorage.getItem(`layout_${layoutName}`));
+            if (layout) {
+                loadLayout(layout);
+                manageLayoutsModal.style.display = 'none';
+            }
+        });
+        return loadButton;
+    }
 
-function loadVideos() {
-    const savedVideos = JSON.parse(localStorage.getItem('videos') || '[]');
-    console.log("Loading videos:", savedVideos);  // Debugging log
-    savedVideos.forEach(video => {
-        const videoContainer = document.createElement("div");
-        videoContainer.className = "video-container";
-        videoContainer.style.width = video.width;
-        videoContainer.style.height = video.height;
-        videoContainer.style.transform = `translate(${video.x}px, ${video.y}px)`;
-        videoContainer.dataset.x = video.x;
-        videoContainer.dataset.y = video.y;
-        const iframe = document.createElement("iframe");
-        iframe.src = `https://www.youtube.com/embed/${video.id}`;
-        iframe.allowFullscreen = true;
-        const removeButton = document.createElement("button");
-        removeButton.className = "remove-video";
-        removeButton.innerText = "Remove";
-        removeButton.onclick = function() {
-            removeVideo(removeButton);
-        };
-        videoContainer.appendChild(iframe);
-        videoContainer.appendChild(removeButton);
-        document.getElementById("videoContainer").appendChild(videoContainer);
+    function createDeleteButton(layoutName) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.addEventListener('click', () => {
+            localStorage.removeItem(`layout_${layoutName}`);
+            loadSavedLayouts();
+        });
+        return deleteButton;
+    }
 
-        makeInteractable(videoContainer);
-    });
-}
+    function getEmbedUrl(url) {
+        const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        const match = url.match(regex);
+        if (match && match[1]) {
+            return `https://www.youtube.com/embed/${match[1]}`;
+        } else if (url.includes('youtube.com/live')) {
+            const liveRegex = /(?:youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/;
+            const liveMatch = url.match(liveRegex);
+            if (liveMatch && liveMatch[1]) {
+                return `https://www.youtube.com/embed/${liveMatch[1]}?autoplay=1`;
+            }
+        }
+        return null;
+    }
+
+    function addVideo(url, videoData = null) {
+        const videoBox = document.createElement('div');
+        videoBox.classList.add('video-box');
+        videoBox.setAttribute('data-id', Date.now());
+
+        if (videoData) {
+            videoBox.style.left = videoData.position.x;
+            videoBox.style.top = videoData.position.y;
+            videoBox.style.width = videoData.size.width;
+            videoBox.style.height = videoData.size.height;
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.allow = 'autoplay; encrypted-media';
+        videoBox.appendChild(iframe);
+
+        const removeButton = document.createElement('button');
+        removeButton.textContent = '×';
+        removeButton.classList.add('remove-button');
+        removeButton.addEventListener('click', () => {
+            videoBox.remove();
+        });
+        videoBox.appendChild(removeButton);
+
+        gridContainer.appendChild(videoBox);
+
+        interact(videoBox)
+            .draggable({
+                onmove: dragMoveListener
+            })
+            .resizable({
+                edges: { left: true, right: true, bottom: true, top: true }
+            })
+            .on('resizemove', (event) => {
+                let target = event.target;
+                let x = (parseFloat(target.getAttribute('data-x')) || 0);
+                let y = (parseFloat(target.getAttribute('data-y')) || 0);
+
+                // Update the element's style
+                target.style.width = event.rect.width + 'px';
+                target.style.height = event.rect.height + 'px';
+
+                // Translate when resizing from top or left edges
+                x += event.deltaRect.left;
+                y += event.deltaRect.top;
+
+                target.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+
+                target.setAttribute('data-x', x);
+                target.setAttribute('data-y', y);
+            });
+    }
+
+    function dragMoveListener(event) {
+        var target = event.target;
+        // Keep the dragged position in the data-x/data-y attributes
+        var x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+        var y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+        // Translate the element
+        target.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+
+        // Update the position attributes
+        target.setAttribute('data-x', x);
+        target.setAttribute('data-y', y);
+    }
+});
