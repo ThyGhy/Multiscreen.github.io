@@ -22,10 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('darkMode', darkModeToggle.checked);
     });
 
-    // Load saved layout
-    const savedLayout = JSON.parse(localStorage.getItem('currentVideoLayout'));
-    if (savedLayout) {
-        loadLayout(savedLayout);
+    // Load default layout
+    const defaultLayout = JSON.parse(localStorage.getItem('defaultVideoLayout'));
+    if (defaultLayout) {
+        loadLayout(defaultLayout);
     }
 
     manageLayoutsButton.addEventListener('click', () => {
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addVideo(embedUrl);
                 addVideoModal.style.display = 'none';
                 addVideoForm.reset();
-                saveCurrentLayout();
+                saveDefaultLayout();
             } else {
                 alert('Invalid YouTube URL.');
             }
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const layout = JSON.parse(localStorage.getItem(`layout_${layoutName}`));
             if (layout) {
                 loadLayout(layout);
-                localStorage.setItem('currentVideoLayout', JSON.stringify(layout));
+                localStorage.setItem('defaultVideoLayout', JSON.stringify(layout));
                 manageLayoutsModal.style.display = 'none';
             }
         });
@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         removeButton.classList.add('remove-button');
         removeButton.addEventListener('click', () => {
             videoBox.remove();
-            saveCurrentLayout();
+            saveDefaultLayout();
         });
         videoBox.appendChild(removeButton);
 
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 target.setAttribute('data-y', y);
             });
 
-        saveCurrentLayout();
+        saveDefaultLayout();
     }
 
     function getCurrentLayout() {
@@ -221,9 +221,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return layout;
     }
 
-    function saveCurrentLayout() {
+    function saveDefaultLayout() {
         const layout = getCurrentLayout();
-        localStorage.setItem('currentVideoLayout', JSON.stringify(layout));
+        localStorage.setItem('defaultVideoLayout', JSON.stringify(layout));
     }
 
     function dragMoveListener(event) {
@@ -239,6 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
         target.setAttribute('data-x', x);
         target.setAttribute('data-y', y);
 
-        saveCurrentLayout();
+        saveDefaultLayout();
     }
 });
