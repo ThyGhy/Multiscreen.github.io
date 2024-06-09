@@ -23,10 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Load default layout
-    const defaultLayout = JSON.parse(localStorage.getItem('defaultVideoLayout'));
-    if (defaultLayout) {
-        loadLayout(defaultLayout);
-    }
+    loadDefaultLayout();
 
     manageLayoutsButton.addEventListener('click', () => {
         manageLayoutsModal.style.display = 'block';
@@ -224,6 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveDefaultLayout() {
         const layout = getCurrentLayout();
         localStorage.setItem('defaultVideoLayout', JSON.stringify(layout));
+    }
+
+    function loadDefaultLayout() {
+        const defaultLayout = JSON.parse(localStorage.getItem('defaultVideoLayout'));
+        if (defaultLayout) {
+            loadLayout(defaultLayout);
+        }
     }
 
     function dragMoveListener(event) {
